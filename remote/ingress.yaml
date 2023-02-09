@@ -1,0 +1,72 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    email: admin@my.app
+    privateKeySecretRef:
+      name: letsencrypt
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+---
+apiVersion: v1
+data:
+  add-headers: "ingress-nginx/security-headers"
+  use-gzip: "true"
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+---
+apiVersion: v1
+data:
+  Content-Security-Policy: "base-uri 'self'; default-src 'self'; font-src 'self' https: data:; form-action 'self'; frame-ancestors 'self'; img-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net/; script-src-attr 'none'; style-src 'self' https: 'unsafe-inline'; upgrade-insecure-requests"
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Origin-Agent-Cluster: "?1"
+  Referrer-Policy: no-referrer
+  Strict-Transport-Security: max-age=15552000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-DNS-Prefetch-Control: "off"
+  X-Download-Options: noopen
+  X-Frame-Options: SAMEORIGIN
+  X-Permitted-Cross-Domain-Policies: none
+  X-XSS-Protection: "0"
+kind: ConfigMap
+metadata:
+  name: security-headers
+  namespace: ingress-nginx
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+  name: app
+spec:
+  defaultBackend:
+    service:
+      name: app
+      port:
+        number: 80
+  ingressClassName: nginx
+  rules:
+    - host: my.app
+      http:
+        paths:
+          - backend:
+              service:
+                name: app
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - my.app
+      secretName: letsencrypt

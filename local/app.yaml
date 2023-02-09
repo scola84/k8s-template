@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: app
+  template:
+    metadata:
+      labels:
+        name: app
+    spec:
+      containers:
+        - args: ["run", "tscw"]
+          command: ["npm"]
+          env:
+            - name: HEALTH_PORT
+              value: "8000"
+            - name: NAME
+              value: My App
+            - name: NODE_ENV
+              value: development
+            - name: PORT
+              value: "3000"
+            - name: POSTGRES_URI
+              valueFrom:
+                secretKeyRef:
+                  key: postgres-uri
+                  name: postgres-uri
+            - name: REDIS_URI
+              valueFrom:
+                secretKeyRef:
+                  key: redis-uri
+                  name: redis-uri
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: session-secret
+                  name: session-secret
+          image: node:18
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8000
+          name: app
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+          resources:
+          volumeMounts:
+            - name: app
+              mountPath: /usr/src/app
+          workingDir: /usr/src/app
+      restartPolicy: Always
+      volumes:
+        - name: app
+          hostPath:
+            path: /usr/src/app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+  selector:
+    name: app

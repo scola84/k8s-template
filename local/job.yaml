@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: job
+  template:
+    metadata:
+      labels:
+        name: job
+    spec:
+      containers:
+        - args: ["run", "tscw"]
+          command: ["npm"]
+          env:
+            - name: HEALTH_PORT
+              value: "8000"
+            - name: NODE_ENV
+              value: development
+            - name: POSTGRES_URI
+              valueFrom:
+                secretKeyRef:
+                  key: postgres-uri
+                  name: postgres-uri
+            - name: QUEUES
+              value: parent
+            - name: REDIS_URI
+              valueFrom:
+                secretKeyRef:
+                  key: redis-uri
+                  name: redis-uri
+            - name: WORKERS
+              value: "child:parent"
+          image: node:18
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8000
+          name: job
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+          resources:
+          volumeMounts:
+            - name: job
+              mountPath: /usr/src/job
+          workingDir: /usr/src/job
+      restartPolicy: Always
+      volumes:
+        - name: job
+          hostPath:
+            path: /usr/src/job
